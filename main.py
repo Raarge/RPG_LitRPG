@@ -17,35 +17,32 @@ def main():
         "in_combat": True
     }
 
-    def monster_turn():
+    def monster_ai_tick():
         m = state["monster"]
-        if not state["in_combat"]:
-            return
-        if m is None or m.hp <= 0:
-            return
-        if not m.can_act():
-            return
+        p = state["player"]
 
-        action = m.choose_action()
-        result = action()
+        if state["in_combat"] and m and m.hp > 0:
+            if m.can_act():
+                action = m.choose_action()
+                result = action()
 
-        # If action is movement
-        if isinstance(result, str):
-            ui.log(result, "info")
-            return
+                if isinstance(result, str):
+                    ui.log(result, "info")
+                else:
+                    damage, msg, crit = result
+                    if damage > 0:
+                        p.hp -= damage
+                        tag = "monster_crit" if crit else "monster_hit"
+                        ui.log(msg, tag)
 
-        damage, msg, crit = result
-        if damage > 0:
-            state["player"].hp -= damage
-            tag = "monster_crit" if crit else "monster_hit"
-            ui.log(msg, tag)
-            if state["player"].hp <= 0:
-                state["player"].hp = 0
-                ui.log("You were defeated!", "defeat")
-                state["in_combat"] = False
-                ui.disable_actions()
-        else:
-            ui.log(msg, "info")
+                        if p.hp <= 0:
+                            p.hp = 0
+                            ui.log("You were defeated!", "defeat")
+                            state["in_combat"] = False
+                            ui.disable_actions()
+
+        root.after(200, monster_ai_tick)
+
 
     def handle_action(action_name):
         if not state["in_combat"]:
@@ -90,17 +87,17 @@ def main():
             else:
                 ui.log(msg, "info")
 
-            monster_turn()
+           
 
         elif action_name == "advance":
             msg = p.advance()
             ui.log(msg, "info")
-            monster_turn()
+            
 
         elif action_name == "retreat":
             msg = p.retreat()
             ui.log(msg, "info")
-            monster_turn()
+            
 
         elif action_name == "flee":
             msg = p.flee(m)
@@ -109,13 +106,13 @@ def main():
                 state["in_combat"] = False
                 ui.disable_actions()
                 ui.show_fight_prompt()
-            else:
-                monster_turn()
+            
+                
 
         elif action_name == "potion":
             msg = p.use_potion()
             ui.log(msg, "info")
-            monster_turn()
+            
 
     def on_fight_another():
         new_monster = generate_monster(player.level)
