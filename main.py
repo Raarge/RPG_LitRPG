@@ -136,6 +136,8 @@ def main():
 
     ui = GameUI(root, player, monster, handle_action, on_fight_another, on_stop)
     ui.log(f"A wild {monster} appears!", "info")
+    monster_ai_tick()
+
 
     def on_rest_continue():
         # Auto-save on rest
