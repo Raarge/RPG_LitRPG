@@ -33,6 +33,12 @@ class Player:
         # Training points
         self.training_points = 0
 
+        # Gold
+        self.gold = 0
+
+        self.weapon_damage = 2   # basic sword
+
+
     # ---------------------------------------------------------
     # STATS DICT FOR UI
     # ---------------------------------------------------------
@@ -118,12 +124,14 @@ class Player:
         self.xp_required = data.get("xp_required", 100)
 
         # Stats (fallbacks ensure old saves load safely)
-        self.strength = data.get("strength", 10)
-        self.dexterity = data.get("dexterity", 10)
-        self.constitution = data.get("constitution", 10)
-        self.intelligence = data.get("intelligence", 10)
-        self.wisdom = data.get("wisdom", 10)
+        self.strength = data.get("strength", 5)
+        self.dexterity = data.get("dexterity", 5)
+        self.constitution = data.get("constitution", 5)
+        self.intelligence = data.get("intelligence", 5)
+        self.wisdom = data.get("wisdom", 5)
         self.dispell = data.get("dispell", 0)
+        self.weapon_damage = data.get("weapon_damage", 2)
+
 
         # Derived pools
         self.max_hp = data.get("max_hp", self.constitution * 10)
@@ -162,8 +170,13 @@ class Player:
             # Training points
             "training_points": self.training_points,
 
+            "weapon_damage": self.weapon_damage,
+
+
             # Gold (if you use it)
-            "gold": getattr(self, "gold", 0)
+            "gold": self.gold
+
+            
         }
 
 

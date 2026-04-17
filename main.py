@@ -196,7 +196,8 @@ def main():
         on_fight_another,
         on_stop,
         on_rest_continue,
-        on_rest_exit
+        on_rest_exit,
+        on_rest_save
     )
 
     ui.log(f"A wild {monster} appears!", "info")
