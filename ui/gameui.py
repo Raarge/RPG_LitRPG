@@ -15,7 +15,8 @@ class GameUI:
         on_fight_another,
         on_stop,
         on_rest_continue=None,
-        on_rest_exit=None
+        on_rest_exit=None,
+        on_rest_save=None
     ):
         self.root = root
         self.player = player
@@ -28,9 +29,7 @@ class GameUI:
         # NEW
         self.on_rest_continue = on_rest_continue
         self.on_rest_exit = on_rest_exit
-
-        #self.build_ui()
-
+        self.on_rest_save = on_rest_save
 
         # ---------------------------------------------------------
         # WINDOW CONFIGURATION
@@ -39,17 +38,14 @@ class GameUI:
         root.geometry("1300x900")
         root.minsize(1200, 850)
 
-        # Grid expansion rules
         root.grid_columnconfigure(0, weight=1)
         root.grid_columnconfigure(1, weight=2)
-        root.grid_rowconfigure(2, weight=1)   # Combat log expands
-        root.grid_rowconfigure(6, minsize=60) # Spacer row before actions
+        root.grid_rowconfigure(2, weight=1)
+        root.grid_rowconfigure(6, minsize=60)
 
         # ---------------------------------------------------------
         # LEFT COLUMN — PLAYER INFO
         # ---------------------------------------------------------
-
-        # Player Stats
         stats_frame = ttk.LabelFrame(root, text="Player Stats")
         stats_frame.grid(row=0, column=0, padx=15, pady=10, sticky="nw")
 
@@ -61,7 +57,6 @@ class GameUI:
             self.stat_labels[stat] = label
             row += 1
 
-        # Player HP
         hp_frame = ttk.LabelFrame(root, text="Player HP")
         hp_frame.grid(row=1, column=0, padx=15, pady=5, sticky="nw")
 
@@ -71,7 +66,6 @@ class GameUI:
         self.hp_bar = ttk.Progressbar(hp_frame, length=260)
         self.hp_bar.grid(row=1, column=0, pady=5)
 
-        # Stamina
         stamina_frame = ttk.LabelFrame(root, text="Stamina")
         stamina_frame.grid(row=2, column=0, padx=15, pady=5, sticky="nw")
 
@@ -81,7 +75,6 @@ class GameUI:
         self.stamina_bar = ttk.Progressbar(stamina_frame, length=260)
         self.stamina_bar.grid(row=1, column=0, pady=5)
 
-        # Level & XP
         level_frame = ttk.LabelFrame(root, text="Level & XP")
         level_frame.grid(row=3, column=0, padx=15, pady=5, sticky="nw")
 
@@ -91,7 +84,6 @@ class GameUI:
         self.xp_bar = ttk.Progressbar(level_frame, length=260)
         self.xp_bar.grid(row=1, column=0, pady=5)
 
-        # Distance & Cooldown
         dc_frame = ttk.LabelFrame(root, text="Distance & Cooldown")
         dc_frame.grid(row=4, column=0, padx=15, pady=5, sticky="nw")
 
@@ -104,15 +96,12 @@ class GameUI:
         # ---------------------------------------------------------
         # RIGHT COLUMN — MONSTER + SKILLS + COMBAT LOG
         # ---------------------------------------------------------
-
-        # Monster Info (HP hidden)
         monster_frame = ttk.LabelFrame(root, text="Monster")
         monster_frame.grid(row=0, column=1, padx=15, pady=10, sticky="nw")
 
         self.monster_label = ttk.Label(monster_frame, text="")
         self.monster_label.grid(row=0, column=0, sticky="w")
 
-        # Skills Panel
         skills_frame = ttk.LabelFrame(root, text="Skills")
         skills_frame.grid(row=1, column=1, padx=15, pady=10, sticky="nw")
 
@@ -129,9 +118,6 @@ class GameUI:
             self.skill_bars[skill_name] = bar
             row += 1
 
-        # ---------------------------------------------------------
-        # COMBAT LOG — FULL HEIGHT COLUMN
-        # ---------------------------------------------------------
         log_frame = ttk.LabelFrame(root, text="Combat Log")
         log_frame.grid(row=2, column=1, rowspan=3, padx=15, pady=10, sticky="nsew")
 
@@ -156,7 +142,6 @@ class GameUI:
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.log_box["yscrollcommand"] = scrollbar.set
 
-        # Log color tags
         self.log_box.tag_config("info", foreground="white")
         self.log_box.tag_config("player_hit", foreground="white")
         self.log_box.tag_config("crit", foreground="red")
@@ -168,7 +153,7 @@ class GameUI:
         self.log_box.tag_config("levelup", foreground="yellow")
 
         # ---------------------------------------------------------
-        # ACTION BUTTONS — PUSHED FAR DOWN
+        # ACTION BUTTONS
         # ---------------------------------------------------------
         buttons_frame = ttk.LabelFrame(root, text="Actions")
         buttons_frame.grid(row=7, column=0, columnspan=2, padx=15, pady=25, sticky="ew")
@@ -186,33 +171,26 @@ class GameUI:
         ttk.Button(buttons_frame, text="Save Game", command=self.save_game).grid(row=2, column=0, padx=10, pady=5)
         ttk.Button(buttons_frame, text="Load Game", command=self.load_game).grid(row=2, column=1, padx=10, pady=5)
 
-
         self.buttons_frame = buttons_frame
 
         # ---------------------------------------------------------
-        # FIGHT-ANOTHER PROMPT — BELOW ACTIONS
+        # PROMPT FRAME (Fight Another / Rest / Training)
         # ---------------------------------------------------------
         prompt_frame = ttk.Frame(root)
         prompt_frame.grid(row=8, column=0, columnspan=2, pady=10)
         self.prompt_frame = prompt_frame
 
-        self.prompt_label = ttk.Label(prompt_frame, text="Fight another?")
+        self.prompt_label = ttk.Label(prompt_frame, text="")
+
         self.prompt_yes = ttk.Button(prompt_frame, text="Yes", command=self.on_fight_another)
         self.prompt_no = ttk.Button(prompt_frame, text="No", command=self.on_stop)
 
-        self.rest_continue_btn = ttk.Button(
-        self.prompt_frame, text="Continue", command=self.on_rest_continue
-        )
-
-        self.rest_exit_btn = ttk.Button(
-            self.prompt_frame, text="Exit Game", command=self.on_rest_exit
-        )
-
-
+        self.rest_continue_btn = ttk.Button(prompt_frame, text="Continue", command=self.on_rest_continue)
+        self.rest_exit_btn = ttk.Button(prompt_frame, text="Exit Game", command=self.on_rest_exit)
+        self.rest_save_btn = ttk.Button(prompt_frame, text="Save", command=self.on_rest_save)
 
         self.hide_fight_prompt()
 
-        # Start UI updates
         self.update_ui()
 
     # ---------------------------------------------------------
@@ -234,6 +212,10 @@ class GameUI:
     # FIGHT ANOTHER PROMPT
     # ---------------------------------------------------------
     def show_fight_prompt(self):
+        self.hide_rest_prompt()
+        self.hide_training_prompt()
+
+        self.prompt_label.config(text="Fight another?")
         self.prompt_label.grid(row=0, column=0, padx=10)
         self.prompt_yes.grid(row=0, column=1, padx=10)
         self.prompt_no.grid(row=0, column=2, padx=10)
@@ -290,16 +272,27 @@ class GameUI:
 
         self.root.after(200, self.update_ui)
 
+    # ---------------------------------------------------------
+    # REST PROMPT
+    # ---------------------------------------------------------
     def show_rest_prompt(self):
-        self.prompt_label.config(text="Rest complete. Continue?")
+        self.hide_fight_prompt()
+        self.hide_training_prompt()
+
+        self.prompt_label.config(text="Rest complete. What now?")
         self.prompt_label.grid(row=0, column=0, padx=10)
+
         self.rest_continue_btn.grid(row=0, column=1, padx=10)
-        self.rest_exit_btn.grid(row=0, column=2, padx=10)
+        self.rest_save_btn.grid(row=0, column=2, padx=10)
+        self.rest_exit_btn.grid(row=0, column=3, padx=10)
 
     def hide_rest_prompt(self):
         for w in self.prompt_frame.winfo_children():
             w.grid_remove()
 
+    # ---------------------------------------------------------
+    # SAVE / LOAD
+    # ---------------------------------------------------------
     def save_game(self):
         data = self.player.to_dict()
 
@@ -310,7 +303,6 @@ class GameUI:
             json.dump(data, f, indent=4)
 
         self.log(f"Game saved to {filename}", "info")
-
 
     def load_game(self):
         filename = f"{self.player.class_obj.name}.json"
@@ -325,7 +317,33 @@ class GameUI:
 
         self.player.from_dict(data)
 
-        # Refresh UI immediately
         self.update_ui()
         self.log("Game loaded successfully.", "info")
 
+    # ---------------------------------------------------------
+    # TRAINING PROMPT
+    # ---------------------------------------------------------
+    def show_training_prompt(self, player, on_allocate):
+        self.hide_fight_prompt()
+        self.hide_rest_prompt()
+
+        self.prompt_label.config(
+            text=f"You have {player.training_points} training points. Allocate them:"
+        )
+        self.prompt_label.grid(row=0, column=0, padx=10)
+
+        stats = ["STR", "DEX", "CON", "INT", "WIS", "DISPELL"]
+
+        col = 1
+        for stat in stats:
+            btn = ttk.Button(
+                self.prompt_frame,
+                text=f"+1 {stat}",
+                command=lambda s=stat: on_allocate(s)
+            )
+            btn.grid(row=0, column=col, padx=5)
+            col += 1
+
+    def hide_training_prompt(self):
+        for w in self.prompt_frame.winfo_children():
+            w.grid_remove()

@@ -1,117 +1,74 @@
 import random
-from engine.skill import Skill
-from engine.distance import Distance
-from classes.baseclass import BaseClass
+import time
 
-class Warrior(BaseClass):
+class Warrior:
     name = "Warrior"
 
     def __init__(self):
-        self.weapon_damage = 2
-        self.weapon_weight = 2
-        self.rage_slash_rank = 1
-        self.rage_slash_cost = 3
+        self.skills = {}
 
-        self.skills = {
-            "Lunge": Skill("Lunge"),
-            "Slash": Skill("Slash"),
-            "Draw": Skill("Draw"),
-            "Rage Slash": Skill("Rage Slash")
-        }
-
-    def can_wield_weapon(self, player):
-        return self.weapon_weight <= player.strength * 0.75
-
-    def strength_modifier(self, player):
-        return player.strength * 0.02
-
-    def _compute_damage(self, base, player, skill):
-        str_mod = self.strength_modifier(player)
-        damage = base + str_mod
-
-        # Damage variance ±10%
-        damage *= random.uniform(0.9, 1.1)
-
-        # Critical hits: 2% per skill level, capped at 25%
-        crit_chance = min(0.25, skill.level * 0.02)
-        crit = random.random() < crit_chance
-        if crit:
-            damage *= 1.5
-
-        return max(0.0, damage), crit
-
-    def basic_attack(self, player, attack_name):
-        if not player.can_act():
-            return 0.0, "You cannot act yet — still in cooldown.", False
-        if not self.can_wield_weapon(player):
-            return 0.0, "Your strength is too low to wield this weapon.", False
-        if player.distance != Distance.MELEE:
-            return 0.0, "You must be in melee distance to attack.", False
-
-        player.set_cooldown(2)
-        skill = self.skills[attack_name]
-        if not skill.attempt():
-            return 0.0, f"{attack_name} failed!", False
-
-        damage, crit = self._compute_damage(1, player, skill)
-
-        level_msg = None
-        if skill.add_xp(0.02):
-            level_msg = f"{attack_name} leveled up! Now level {skill.level}"
-
-        if crit:
-            msg = f"CRITICAL {attack_name} deals {damage:.2f} damage!"
-        else:
-            msg = f"{attack_name} deals {damage:.2f} damage!"
-
-        if level_msg:
-            msg += f" | {level_msg}"
-
-        return damage, msg, crit
-
+    # ---------------------------------------------------------
+    # BASIC ATTACKS
+    # ---------------------------------------------------------
     def lunge(self, player):
-        return self.basic_attack(player, "Lunge")
+        if not player.can_act():
+            return 0, "You are still recovering!", False
+
+        base = player.strength * 1.2
+        crit = random.random() < 0.10
+        damage = int(base * (2 if crit else 1))
+
+        player.cooldown_until = time.time() + 1.5
+        return damage, f"You lunge forward for {damage} damage!", crit
 
     def slash(self, player):
-        return self.basic_attack(player, "Slash")
+        if not player.can_act():
+            return 0, "You are still recovering!", False
 
+        base = player.strength
+        crit = random.random() < 0.15
+        damage = int(base * (2 if crit else 1))
+
+        player.cooldown_until = time.time() + 1.2
+        return damage, f"You slash the enemy for {damage} damage!", crit
+
+    # ---------------------------------------------------------
+    # DRAW ATTACK (stronger, slower)
+    # ---------------------------------------------------------
     def draw(self, player):
-        return self.basic_attack(player, "Draw")
+        if not player.can_act():
+            return 0, "You are still recovering!", False
 
+        base = player.strength * 1.5
+        crit = random.random() < 0.20
+        damage = int(base * (2 if crit else 1))
+
+        player.cooldown_until = time.time() + 2.0
+        return damage, f"You draw back and strike hard for {damage} damage!", crit
+
+    # ---------------------------------------------------------
+    # RAGE SLASH (high crit chance)
+    # ---------------------------------------------------------
     def rage_slash(self, player):
         if not player.can_act():
-            return 0.0, "You cannot act yet — still in cooldown.", False
-        if not self.can_wield_weapon(player):
-            return 0.0, "Your strength is too low to wield this weapon.", False
-        if player.distance != Distance.MELEE:
-            return 0.0, "You must be in melee distance to use Rage Slash.", False
-        if player.stamina < self.rage_slash_cost:
-            return 0.0, "Not enough stamina to perform Rage Slash.", False
+            return 0, "You are still recovering!", False
 
-        player.set_cooldown(4)
-        skill = self.skills["Rage Slash"]
-        if not skill.attempt():
-            return 0.0, "Rage Slash failed!", False
+        base = player.strength * 1.3
+        crit = random.random() < 0.35
+        damage = int(base * (2 if crit else 1))
 
-        player.stamina -= self.rage_slash_cost
+        player.cooldown_until = time.time() + 2.5
+        return damage, f"You unleash a rage slash for {damage} damage!", crit
 
-        base = self.weapon_damage + 3 * self.rage_slash_rank
-        damage, crit = self._compute_damage(base, player, skill)
-
-        level_msg = None
-        if skill.add_xp(0.02):
-            level_msg = f"Rage Slash leveled up! Now level {skill.level}"
-
-        if crit:
-            msg = f"CRITICAL Rage Slash hits for {damage:.2f} damage! (Stamina left: {player.stamina})"
-        else:
-            msg = f"Rage Slash hits for {damage:.2f} damage! (Stamina left: {player.stamina})"
-
-        if level_msg:
-            msg += f" | {level_msg}"
-
-        return damage, msg, crit
-
+    # ---------------------------------------------------------
+    # LEVEL UP GAINS
+    # ---------------------------------------------------------
     def level_up(self, player):
         player.strength += 2
-        player.constitution += 1
+        player.constitution += 2
+
+        player.max_hp = player.constitution * 10
+        player.max_stamina = player.constitution * 5
+
+        player.hp = player.max_hp
+        player.stamina = player.max_stamina

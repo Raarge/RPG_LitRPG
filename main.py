@@ -4,6 +4,7 @@ from classes.warrior import Warrior
 from engine.generator import generate_monster, generate_loot
 from ui.gameui import GameUI
 
+
 def main():
     player_class = Warrior()
     player = Player(player_class)
@@ -17,6 +18,9 @@ def main():
         "in_combat": True
     }
 
+    # ---------------------------------------------------------
+    # MONSTER AI (ROUNDTIME-BASED)
+    # ---------------------------------------------------------
     def monster_ai_tick():
         m = state["monster"]
         p = state["player"]
@@ -43,7 +47,35 @@ def main():
 
         root.after(200, monster_ai_tick)
 
+    # ---------------------------------------------------------
+    # TRAINING POINT ALLOCATION
+    # ---------------------------------------------------------
+    def on_allocate_stat(stat_name):
+        p = state["player"]
 
+        if p.allocate_stat(stat_name):
+            ui.log(f"You increased {stat_name}!", "info")
+
+        # Still have points? Keep prompting
+        if p.training_points > 0:
+            ui.show_training_prompt(p, on_allocate_stat)
+            return
+
+        # No points left → close training UI and resume game
+        ui.hide_training_prompt()   # <-- THIS is the missing piece
+        ui.enable_actions()
+        state["in_combat"] = True   # <-- Resume combat loop
+
+
+    def handle_level_up():
+        p = state["player"]
+        if p.training_points > 0:
+            ui.disable_actions()
+            ui.show_training_prompt(p, on_allocate_stat)
+
+    # ---------------------------------------------------------
+    # PLAYER ACTION HANDLER
+    # ---------------------------------------------------------
     def handle_action(action_name):
         if not state["in_combat"]:
             return
@@ -65,6 +97,7 @@ def main():
                 m.hp -= damage
                 tag = "crit" if crit else "player_hit"
                 ui.log(msg, tag)
+
                 if m.hp <= 0:
                     m.hp = 0
                     ui.log("You defeated the monster!", "victory")
@@ -79,25 +112,24 @@ def main():
                     ui.log(loot_msg, "loot")
                     if rare:
                         ui.log(f"You found: {rare}", "loot")
-                    if leveled:
-                        ui.log(f"You reached level {p.level}!", "levelup")
 
-                    ui.show_fight_prompt()
+                    if leveled:
+                        ui.log("You leveled up!", "levelup")
+                        handle_level_up()
+                    else:
+                        ui.show_fight_prompt()
+
                     return
             else:
                 ui.log(msg, "info")
 
-           
-
         elif action_name == "advance":
             msg = p.advance()
             ui.log(msg, "info")
-            
 
         elif action_name == "retreat":
             msg = p.retreat()
             ui.log(msg, "info")
-            
 
         elif action_name == "flee":
             msg = p.flee(m)
@@ -106,14 +138,14 @@ def main():
                 state["in_combat"] = False
                 ui.disable_actions()
                 ui.show_fight_prompt()
-            
-                
 
         elif action_name == "potion":
             msg = p.use_potion()
             ui.log(msg, "info")
-            
 
+    # ---------------------------------------------------------
+    # FIGHT-ANOTHER / REST FLOW
+    # ---------------------------------------------------------
     def on_fight_another():
         new_monster = generate_monster(player.level)
         state["monster"] = new_monster
@@ -127,58 +159,59 @@ def main():
         state["in_combat"] = False
         ui.hide_fight_prompt()
         ui.disable_actions()
-
         ui.log("You decide to rest.", "info")
-
-        # Show the rest prompt so the player can continue or exit
         ui.show_rest_prompt()
 
-
-    ui = GameUI(root, player, monster, handle_action, on_fight_another, on_stop)
-    ui.log(f"A wild {monster} appears!", "info")
-    monster_ai_tick()
-
-
     def on_rest_continue():
-        # Auto-save on rest
         msg = state["player"].save()
         ui.log(msg, "info")
         ui.log("You feel rested.", "info")
 
-        # Spawn next monster
         new_monster = generate_monster(state["player"].level)
         state["monster"] = new_monster
         ui.set_monster(new_monster)
 
-        # Resume combat
         state["in_combat"] = True
         ui.hide_rest_prompt()
         ui.enable_actions()
         ui.log(f"A new {new_monster} approaches!", "info")
 
-
     def on_rest_exit():
         root.destroy()
 
+    def on_rest_save():
+        msg = state["player"].save()
+        ui.log(msg, "info")
+        ui.log("Progress saved while resting.", "info")
+
+
+    # ---------------------------------------------------------
+    # UI SETUP
+    # ---------------------------------------------------------
     ui = GameUI(
-    root,
-    player,
-    monster,
-    handle_action,
-    on_fight_another,
-    on_stop,
-    on_rest_continue,
-    on_rest_exit
-)
+        root,
+        player,
+        monster,
+        handle_action,
+        on_fight_another,
+        on_stop,
+        on_rest_continue,
+        on_rest_exit
+    )
 
+    ui.log(f"A wild {monster} appears!", "info")
 
-
+    # ---------------------------------------------------------
+    # REGEN TICK
+    # ---------------------------------------------------------
     def regen_tick():
         player.regen(state["in_combat"])
         root.after(5000, regen_tick)
 
     regen_tick()
+    monster_ai_tick()
     root.mainloop()
+
 
 if __name__ == "__main__":
     main()

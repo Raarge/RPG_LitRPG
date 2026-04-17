@@ -1,18 +1,41 @@
 import time
-from engine.combatant import Combatant
-from engine.distance import Distance
 import json
 import os
 
-class Human:
-    def __init__(self):
-        self.strength = 5
-        self.dexterity = 5
-        self.constitution = 5
-        self.intelligence = 5
-        self.wisdom = 5
-        self.dispell = 5
+class Player:
+    def __init__(self, class_obj):
+        self.class_obj = class_obj
 
+        # Base stats
+        self.strength = 10
+        self.dexterity = 10
+        self.constitution = 10
+        self.intelligence = 10
+        self.wisdom = 10
+        self.dispell = 0
+
+        # Derived pools
+        self.max_hp = self.constitution * 10
+        self.hp = self.max_hp
+
+        self.max_stamina = self.constitution * 5
+        self.stamina = self.max_stamina
+
+        # XP & Level
+        self.level = 1
+        self.xp = 0
+        self.xp_required = 100
+
+        # Combat
+        self.distance = 1
+        self.cooldown_until = 0
+
+        # Training points
+        self.training_points = 0
+
+    # ---------------------------------------------------------
+    # STATS DICT FOR UI
+    # ---------------------------------------------------------
     def stats(self):
         return {
             "STR": self.strength,
@@ -23,105 +46,97 @@ class Human:
             "DISPELL": self.dispell
         }
 
-class Player(Human, Combatant):
-    def __init__(self, class_obj):
-        Human.__init__(self)
-        Combatant.__init__(self)
-        self.class_obj = class_obj
+    # ---------------------------------------------------------
+    # CAN ACT?
+    # ---------------------------------------------------------
+    def can_act(self):
+        return time.time() >= self.cooldown_until
 
-        self.level = 1
-        self.xp = 0.0
-        self.xp_required = 100.0
-
-        self.gold = 0
-        self.potions = 10
-        self.potion_cooldown_until = 0.0
-
-        self._init_pools()
-
-    def _init_pools(self):
-        self.max_hp = self.constitution * 10
-        self.hp = self.max_hp
-        self.max_stamina = self.constitution * 5
-        self.stamina = self.max_stamina
-
-    def update_pools_on_level(self):
-        old_max_hp = self.max_hp
-        self.max_hp = self.constitution * 10
-        delta_hp = self.max_hp - old_max_hp
-        self.hp = min(self.max_hp, self.hp + max(0, delta_hp))
-
-        old_max_stam = self.max_stamina
-        self.max_stamina = self.constitution * 5
-        delta_stam = self.max_stamina - old_max_stam
-        self.stamina = min(self.max_stamina, self.stamina + max(0, delta_stam))
-
+    # ---------------------------------------------------------
+    # LEVELING
+    # ---------------------------------------------------------
     def gain_xp(self, amount):
         self.xp += amount
         leveled = False
+
         while self.xp >= self.xp_required:
             self.xp -= self.xp_required
             self.level += 1
-            self.xp_required *= 1.5
+            self.xp_required = int(self.xp_required * 1.5)
+
+            # Class-specific stat gains
             self.class_obj.level_up(self)
+
+            # Update HP/Stamina pools
             self.update_pools_on_level()
+
+            # Training points per level
+            self.training_points += 2
+
             leveled = True
+
         return leveled
 
-    def regen(self, in_combat: bool):
-        # --- Health regeneration ---
-        # Full heal in 30 minutes (1800s) with 5s ticks => 360 ticks
-        base_hp = self.max_hp / 360.0
-        hp_amount = base_hp / 2.0 if in_combat else base_hp
+    def update_pools_on_level(self):
+        self.max_hp = self.constitution * 10
+        self.max_stamina = self.constitution * 5
+        self.hp = self.max_hp
+        self.stamina = self.max_stamina
 
-        if self.hp < self.max_hp:
-            self.hp = min(self.max_hp, self.hp + hp_amount)
+    # ---------------------------------------------------------
+    # TRAINING POINT ALLOCATION
+    # ---------------------------------------------------------
+    def allocate_stat(self, stat_name):
+        if self.training_points <= 0:
+            return False
 
-        # --- Stamina regeneration ---
-        # Same 30-minute full regen, but NEVER halved in combat
-        base_stam = self.max_stamina / 360.0
+        self.training_points -= 1
 
-        if self.stamina < self.max_stamina:
-            self.stamina = min(self.max_stamina, self.stamina + base_stam)
+        if stat_name == "STR":
+            self.strength += 1
+        elif stat_name == "DEX":
+            self.dexterity += 1
+        elif stat_name == "CON":
+            self.constitution += 1
+            self.update_pools_on_level()
+        elif stat_name == "INT":
+            self.intelligence += 1
+        elif stat_name == "WIS":
+            self.wisdom += 1
+        elif stat_name == "DISPELL":
+            self.dispell += 1
 
+        return True
 
-    def can_use_potion(self):
-        return time.time() >= self.potion_cooldown_until
+    # ---------------------------------------------------------
+    # SAVE / LOAD
+    # ---------------------------------------------------------
+    def from_dict(self, data):
+        # Core progression
+        self.level = data.get("level", 1)
+        self.xp = data.get("xp", 0)
+        self.xp_required = data.get("xp_required", 100)
 
-    def use_potion(self):
-        if self.potions <= 0:
-            return "You have no potions left."
-        if not self.can_use_potion():
-            return "You cannot use a potion yet."
-        if self.hp >= self.max_hp:
-            return "You are already at full health."
+        # Stats (fallbacks ensure old saves load safely)
+        self.strength = data.get("strength", 10)
+        self.dexterity = data.get("dexterity", 10)
+        self.constitution = data.get("constitution", 10)
+        self.intelligence = data.get("intelligence", 10)
+        self.wisdom = data.get("wisdom", 10)
+        self.dispell = data.get("dispell", 0)
 
-        self.potions -= 1
-        self.potion_cooldown_until = time.time() + 5  # 5s cooldown
-        heal_amount = int(self.max_hp * 0.30)
-        old_hp = self.hp
-        self.hp = min(self.max_hp, self.hp + heal_amount)
-        actual_heal = int(self.hp - old_hp)
-        return f"You drink a potion and recover {actual_heal} HP."
+        # Derived pools
+        self.max_hp = data.get("max_hp", self.constitution * 10)
+        self.hp = data.get("hp", self.max_hp)
 
-    def flee(self, monster=None):
-        from random import random
-        if not self.can_act():
-            return "You cannot flee — still in cooldown."
+        self.max_stamina = data.get("max_stamina", self.constitution * 5)
+        self.stamina = data.get("stamina", self.max_stamina)
 
-        base_chance = {
-            Distance.RANGED: 0.90,
-            Distance.POLE:   0.70,
-            Distance.MELEE:  0.50
-        }[self.distance]
-        dex_bonus = self.dexterity * 0.01
-        flee_chance = min(base_chance + dex_bonus, 0.95)
+        # Training points (new system)
+        self.training_points = data.get("training_points", 0)
 
-        roll = random()
-        if roll <= flee_chance:
-            return "You successfully fled the battle!"
-        self.set_cooldown(2)
-        return "You failed to flee!"
+        # Gold (if present)
+        self.gold = data.get("gold", 0)
 
     def to_dict(self):
         return {
@@ -129,69 +144,100 @@ class Player(Human, Combatant):
             "level": self.level,
             "xp": self.xp,
             "xp_required": self.xp_required,
+
+            # Stats
+            "strength": self.strength,
+            "dexterity": self.dexterity,
+            "constitution": self.constitution,
+            "intelligence": self.intelligence,
+            "wisdom": self.wisdom,
+            "dispell": self.dispell,
+
+            # Pools
             "hp": self.hp,
             "max_hp": self.max_hp,
             "stamina": self.stamina,
             "max_stamina": self.max_stamina,
-            "gold": self.gold,
-            "distance": self.distance,
-            "cooldown_until": self.cooldown_until,
-            "stats": self.stats(),
-            "skills": {
-                name: {
-                    "level": skill.level,
-                    "xp": skill.xp,
-                    "xp_required": skill.xp_required
-            }
-            for name, skill in self.class_obj.skills.items()
+
+            # Training points
+            "training_points": self.training_points,
+
+            # Gold (if you use it)
+            "gold": getattr(self, "gold", 0)
         }
-    }
 
-
-    def from_dict(self, data):
-        self.level = data["level"]
-        self.xp = data["xp"]
-        self.xp_required = data["xp_required"]
-        self.hp = data["hp"]
-        self.max_hp = data["max_hp"]
-        self.stamina = data["stamina"]
-        self.max_stamina = data["max_stamina"]
-        self.gold = data["gold"]
-        self.distance = data["distance"]
-        self.cooldown_until = data["cooldown_until"]
-
-        # Restore stats
-        for key, value in data["stats"].items():
-            setattr(self, key.lower(), value)
-
-        # Restore skills
-        for name, skill_data in data["skills"].items():
-            skill = self.class_obj.skills[name]
-            skill.level = skill_data["level"]
-            skill.xp = skill_data["xp"]
-            skill.xp_required = skill_data["xp_required"]
 
     def save(self):
         data = self.to_dict()
         filename = f"{self.class_obj.name}.json"
-        path = os.path.join(os.getcwd(), filename)
-
-        with open(path, "w") as f:
+        with open(filename, "w") as f:
             json.dump(data, f, indent=4)
-
-        return f"Game saved to {filename}"
-
+        return f"Saved to {filename}"
 
     def load(self):
         filename = f"{self.class_obj.name}.json"
-        path = os.path.join(os.getcwd(), filename)
-
-        if not os.path.exists(path):
+        if not os.path.exists(filename):
             return "No save file found."
 
-        with open(path, "r") as f:
+        with open(filename, "r") as f:
             data = json.load(f)
 
         self.from_dict(data)
-        return "Game loaded successfully."
+        return "Game loaded."
 
+    def regen(self, in_combat):
+        # HP regeneration: slow, halved during combat
+        hp_regen = self.max_hp / 360
+        if in_combat:
+            hp_regen *= 0.5
+        self.hp = min(self.max_hp, self.hp + hp_regen)
+
+        # Stamina regeneration: faster, NOT halved in combat
+        stam_regen = self.max_stamina / 180
+        self.stamina = min(self.max_stamina, self.stamina + stam_regen)
+
+    # ---------------------------------------------------------
+    # DISTANCE-BASED MOVEMENT
+    # ---------------------------------------------------------
+    def advance(self):
+        if self.distance <= 1:
+            return "You are already in melee range."
+
+        self.distance -= 1
+        return f"You advance to distance {self.distance}."
+
+    def retreat(self):
+        if self.distance >= 3:
+            return "You cannot retreat any further."
+
+        self.distance += 1
+        return f"You retreat to distance {self.distance}."
+
+    # ---------------------------------------------------------
+    # FLEE ATTEMPT
+    # ---------------------------------------------------------
+    def flee(self, monster):
+        import random
+
+        # Base flee chance
+        chance = 0.35
+
+        # Dexterity helps fleeing
+        chance += (self.dexterity * 0.005)
+
+        if random.random() < chance:
+            return "You successfully fled the battle!"
+        else:
+            return "You failed to flee!"
+
+    def use_potion(self):
+        # If you want potions to be an inventory item, add inventory logic later.
+        # For now, treat it as a simple heal action.
+
+        if self.hp >= self.max_hp:
+            return "You are already at full health."
+
+        heal_amount = int(self.max_hp * 0.35)  # Heals 35% of max HP
+        self.hp = min(self.max_hp, self.hp + heal_amount)
+
+        return f"You drink a potion and heal {heal_amount} HP."

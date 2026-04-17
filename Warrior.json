@@ -1,43 +1,18 @@
 {
     "class": "Warrior",
-    "level": 1,
-    "xp": 80.0,
-    "xp_required": 100.0,
-    "hp": 44.432378489792484,
-    "max_hp": 50,
-    "stamina": 9.152777777777754,
-    "max_stamina": 25,
-    "gold": 37,
-    "distance": 2,
-    "cooldown_until": 1776196179.6516023,
-    "stats": {
-        "STR": 5,
-        "DEX": 5,
-        "CON": 5,
-        "INT": 5,
-        "WIS": 5,
-        "DISPELL": 5
-    },
-    "skills": {
-        "Lunge": {
-            "level": 2,
-            "xp": 0.03999999999999425,
-            "xp_required": 20.0
-        },
-        "Slash": {
-            "level": 2,
-            "xp": 0.03999999999999425,
-            "xp_required": 20.0
-        },
-        "Draw": {
-            "level": 2,
-            "xp": 0.039999999999990696,
-            "xp_required": 20.0
-        },
-        "Rage Slash": {
-            "level": 1,
-            "xp": 9.699999999999996,
-            "xp_required": 10.0
-        }
-    }
+    "level": 2,
+    "xp": 15.0,
+    "xp_required": 150,
+    "strength": 8,
+    "dexterity": 5,
+    "constitution": 7,
+    "intelligence": 6,
+    "wisdom": 5,
+    "dispell": 0,
+    "hp": 64.94703125432356,
+    "max_hp": 70,
+    "stamina": 35,
+    "max_stamina": 35,
+    "training_points": 0,
+    "gold": 74
 }
